@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fff3e0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="期中要讀不完了">
+<meta name="description" content="期中要讀不完了 · 純前端小遊戲：拖動瞄準、鬆手投放，相同的撞在一起合成更大的一隻。">
+
+<title>期中要讀不完了</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main class="app">
+
+  <!-- ===== 遊戲區 ===== -->
+  <section class="stage" id="stage">
+    <canvas id="game" aria-label="合成大奶娃遊戲區"></canvas>
+
+    <!-- 復活幣：浮在棋盤左上角。
+         刻意不放進頂部資訊條 —— 手機上面板是橫向 flex，
+         多一個卡片會把「分數 / 最高分」擠到 52px 寬還折行（實測面板從 66px 漲到 102px）。
+         這裡 pointer-events 關掉，永遠不會擋住投放。 -->
+    <div class="revive-chip" id="reviveBadge" hidden>
+      <span class="revive-chip-ico" aria-hidden="true">🪙</span><span id="reviveCount">×0</span>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="dialog">
+
+        <!-- ===== 越線第一屏：有復活幣時才出現 ===== -->
+        <div class="revive-ask" id="revivePrompt" hidden>
+          <div class="dialog-emoji">😵</div>
+          <h2>還能再救一下</h2>
+          <p class="dialog-score">本局得分 <strong id="reviveScore">0</strong></p>
+          <p class="revive-hint">清除畫面中所有 1 / 2 / 3 級水果，然後繼續玩</p>
+          <div class="dialog-actions">
+            <button class="btn" id="giveUpBtn" type="button">不了，結束吧</button>
+            <button class="btn btn-revive" id="reviveBtn" type="button">🪙 用一枚復活幣</button>
+          </div>
+          <p class="dialog-hint" id="reviveLeft">還剩 1 枚</p>
+        </div>
+
+        <!-- ===== 第二屏：正式結算 ===== -->
+        <div id="overPanel">
+          <div class="dialog-emoji">🍉</div>
+          <h2 id="overTitle">遊戲結束</h2>
+          <p class="dialog-score">本局得分 <strong id="finalScore">0</strong></p>
+          <p class="dialog-best">最高分 <span id="finalBest">0</span></p>
+
+          <div class="submit-box" id="submitBox">
+            <p class="submit-msg" id="submitMsg">正在結算…</p>
+            <p class="my-name">暱稱：<strong id="myNameLabel">預設用戶</strong>
+              <button class="link-btn" id="editNameBtn" type="button">改暱稱</button>
+            </p>
+            <button class="btn" id="submitBtn" type="button" hidden>重試提交</button>
+          </div>
+
+          <div class="dialog-actions">
+            <button class="btn" id="boardBtn2" type="button">🏆 排行榜</button>
+            <button class="btn btn-primary" id="restartBtn" type="button">再來一局</button>
+          </div>
+          <p class="dialog-hint">按 R 鍵也可重新開始</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 側邊面板 ===== -->
+  <aside class="panel">
+
+    <header class="panel-head">
+      <h1>期中要讀不完了</h1>
+      <p class="subtitle">你說的對，但這就是鼎王麻辣鍋，一桌4個人低消650元任你吃啊，一個人150元湯底，再點個50元的油條，就坐在那邊吃，不用受那個鳥氣，白飯無限盛啊！若飯不夠，店員會跟你90度鞠躬，「貴賓對不起，我們現在白飯在煮，需要等一下，不好意思，貴賓」。我去過鼎王啊！這種態度的啊！鼎王把你當貴賓，點菜的、送菜的還是個美女，不吃飯還有得看，喝完水「欸，我要水」冰水一壺，去鼎王我是不點飲料的啊，冰水一壺冰水一壺冰水一壺，豆腐鴨血豆腐鴨血豆腐鴨血冰水冰水冰水冰水就吃飽啦。</p>
+    </header>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-label">分數</span>
+        <strong class="stat-value" id="score">0</strong>
+      </div>
+      <div class="stat">
+        <span class="stat-label">排行榜</span>
+        <div class="stat-value stat-best" id="best"></div>
+      </div>
+    </div>
+
+    <div class="next-box">
+      <span class="box-label">下一個</span>
+      <canvas id="next" width="160" height="160" aria-label="下一個"></canvas>
+    </div>
+
+    <div class="chain-box">
+      <span class="box-label">合成表</span>
+      <canvas id="chain" width="680" height="112" aria-label="合成順序"></canvas>
+      <p class="chain-note"><strong>500分換一枚復活幣</strong></p>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-wide" id="boardBtn" type="button">
+        <span class="ico">🏆</span><span class="lbl">排行榜</span>
+      </button>
+      <button class="btn" id="soundBtn" type="button" aria-pressed="true">
+        <span class="ico">🔊</span><span class="lbl">音效開</span>
+      </button>
+      <button class="btn btn-primary" id="resetBtn" type="button" title="重新開始">
+        <span class="ico">↻</span><span class="lbl">重開</span>
+      </button>
+    </div>
+
+    <p class="tips"></p>
+
+  </aside>
+
+</main>
+
+<!-- ===== 排行榜彈窗 ===== -->
+<div class="modal" id="boardModal" aria-hidden="true" role="dialog" aria-label="排行榜">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2>🏆 最近高手榜</h2>
+      <button class="icon-btn" id="boardClose" type="button" aria-label="關閉">✕</button>
+    </header>
+    <div class="nick-row">
+      <label class="nick-label" for="nickInput">我的暱稱</label>
+      <input class="nick-input" id="nickInput" type="text" maxlength="12"
+             placeholder="預設用戶" autocomplete="nickname" enterkeyhint="done">
+    </div>
+    <div class="board-list" id="boardList"></div>
+    <footer class="modal-foot">
+      <span class="board-note">只取最近 20 次提交，成績會被後來的人擠下去</span>
+      <button class="btn" id="boardRefresh" type="button">重新整理</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 碰撞形狀資料（按貼圖輪廓自動生成，由 tools/build_parts.py 產出） -->
+<script>
+  document.write('<script src="assets/fruits/parts.js?v=' + Date.now() + '"><\/script>');
+  document.write('<script src="assets/fruits/blur.js?v=' + Date.now() + '"><\/script>');
+  document.write('<script src="game.js?v=' + Date.now() + '"><\/script>');
+  document.write('<script src="leaderboard.min.js?v=' + Date.now() + '"><\/script>');
+</script>
+</body>
+</html>
